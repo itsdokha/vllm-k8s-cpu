@@ -1,0 +1,7 @@
+*
+!docker/vllm/requirements.txt
+!docker/vllm/entrypoint.sh
+!docker/model-downloader/requirements.txt
+!docker/model-downloader/download_model.py
+!privacy_logging/*.py
+!privacy_logging/*.json
