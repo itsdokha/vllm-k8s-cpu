@@ -1,0 +1,6 @@
+k8s/base/secrets.env
+*.env.local
+__pycache__/
+.pytest_cache/
+.venv/
+bench/results/*.raw.json
