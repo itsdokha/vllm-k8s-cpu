@@ -1,0 +1,79 @@
+# Нагрузочный тест эндпоинта изнутри кластера: vllm bench serve
+# из того же образа, токенизатор берётся из PVC с моделью.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vllm-bench
+  labels:
+    app.kubernetes.io/name: vllm
+    app.kubernetes.io/component: bench
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vllm
+        app.kubernetes.io/component: bench
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bench
+          image: vllm-cpu:0.32.0
+          command: ["bash", "/bench/run_bench.sh"]
+          env:
+            - name: BASE_URL
+              value: http://vllm:8000
+            - name: MODEL_NAME
+              value: qwen2.5-1.5b-instruct-w8a8
+            - name: TOKENIZER_DIR
+              value: /models/qwen2.5-1.5b-instruct-w8a8
+            - name: LD_PRELOAD
+              value: ""
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: vllm-secrets
+                  key: VLLM_API_KEY
+          volumeMounts:
+            - name: models
+              mountPath: /models
+              readOnly: true
+            - name: script
+              mountPath: /bench
+              readOnly: true
+            - name: results
+              mountPath: /results
+            - name: cache
+              mountPath: /home/vllm/.cache
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: model-cache
+        - name: script
+          configMap:
+            name: vllm-bench-script
+        - name: results
+          emptyDir: {}
+        - name: cache
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}

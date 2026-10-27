@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: llm
+
+resources:
+  - job.yaml
+  - networkpolicy.yaml
+
+configMapGenerator:
+  - name: vllm-bench-script
+    files:
+      - run_bench.sh
+      - summarize.py
