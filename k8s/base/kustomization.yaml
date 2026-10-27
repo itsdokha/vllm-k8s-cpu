@@ -1,0 +1,44 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: llm
+
+# Метки только на объекты и шаблоны подов. В селекторы их не подмешиваем:
+# иначе kustomize дописывает их и в селектор kube-dns в NetworkPolicy.
+labels:
+  - pairs:
+      app.kubernetes.io/name: vllm
+      app.kubernetes.io/part-of: llm-inference
+    includeSelectors: false
+    includeTemplates: true
+
+resources:
+  - namespace.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - networkpolicy.yaml
+
+# Генераторы дописывают к имени хэш содержимого. Поменяли параметр в
+# config/ и сделали kubectl apply -k: Deployment получит новое имя
+# ConfigMap и перекатится сам, пересобирать образ не нужно.
+configMapGenerator:
+  - name: vllm-config
+    files:
+      - config.yaml=config/vllm-config.yaml
+  - name: vllm-env
+    envs:
+      - config/vllm.env
+  - name: model-env
+    envs:
+      - config/model.env
+
+# secrets.env не хранится в git, шаблон лежит рядом: secrets.env.example.
+# Имя секрета без хэша, чтобы на него могли ссылаться Job'ы из k8s/bench.
+# После смены токена: kubectl -n llm rollout restart deploy/vllm
+secretGenerator:
+  - name: vllm-secrets
+    envs:
+      - secrets.env
+    options:
+      disableNameSuffixHash: true

@@ -1,0 +1,17 @@
+# Аргументы `vllm serve` (ключи совпадают с CLI-флагами без "--").
+# Меняются без пересборки образа: правка файла + kubectl apply -k.
+host: 0.0.0.0
+port: 8000
+served-model-name: qwen2.5-1.5b-instruct-w8a8
+
+# Веса линейных слоёв в int8 (W8A8), dtype задаёт тип активаций и
+# неквантованных слоёв (эмбеддинги, нормализация, lm_head).
+dtype: bfloat16
+max-model-len: 8192
+max-num-seqs: 16
+max-num-batched-tokens: 4096
+
+# Факт обращения логируется, а промпты и ответы вырезает
+# privacy_logging.PromptRedactionFilter (см. README).
+enable-log-requests: true
+enable-log-outputs: true

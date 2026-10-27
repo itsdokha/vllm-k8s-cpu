@@ -1,0 +1,54 @@
+# Сетевая изоляция namespace llm. Всё, что не разрешено явно, запрещено.
+#
+# kubelet (пробы) и kubectl port-forward ходят в под с ноды, а не из сети
+# подов, поэтому эти политики их не блокируют.
+# Важно: политики применяются только с CNI, который их поддерживает
+# (Calico, Cilium). У minikube по умолчанию такого нет: minikube start --cni=calico.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: vllm-server
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: server
+  policyTypes: ["Ingress", "Egress"]
+  ingress:
+    # Клиенты API: Job нагрузочного теста из этого namespace и поды из
+    # namespace'ов с меткой llm-access=true.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: bench
+        - namespaceSelector:
+            matchLabels:
+              llm-access: "true"
+      ports:
+        - port: 8000
+          protocol: TCP
+  egress:
+    # DNS и HTTPS нужны только initContainer'у для скачивания весов с HF.
+    # Политика действует на под целиком, отделить init от основного
+    # контейнера на уровне NetworkPolicy нельзя; сам vLLM работает
+    # с HF_HUB_OFFLINE=1 и в сеть не ходит.
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - ports:
+        - port: 443
+          protocol: TCP
